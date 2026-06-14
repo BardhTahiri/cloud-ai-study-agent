@@ -1,3 +1,7 @@
+import os
+
+os.environ["DATABASE_URL"] = "sqlite:///./storage/test_cloud_ai_study_agent.db"
+
 from backend.app.main import app
 from backend.app.schemas.study import StudyTaskCreate
 from backend.app.services.file_service import clean_extracted_text

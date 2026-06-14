@@ -73,6 +73,20 @@ Then open:
 http://localhost:5173
 ```
 
+## Run With PostgreSQL
+
+The Docker stack includes PostgreSQL:
+
+```bash
+docker compose up --build
+```
+
+Backend health should show the active database:
+
+```text
+http://localhost:8000/health
+```
+
 ## MVP Features
 
 - create/select a course

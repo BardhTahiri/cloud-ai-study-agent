@@ -50,3 +50,4 @@ class StudyTaskResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     service: str
+    database: str
