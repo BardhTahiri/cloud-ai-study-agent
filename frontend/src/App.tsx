@@ -3,6 +3,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   createCourse,
   createStudyTask,
+  deleteStudyTask,
+  getStudyTask,
   listCourses,
   listStudyTasks,
   uploadStudyMaterial
@@ -37,13 +39,42 @@ function App() {
       .catch((err: Error) => setError(err.message));
   }, []);
 
+  useEffect(() => {
+    if (!selectedTask || !["pending", "processing"].includes(selectedTask.status)) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      getStudyTask(selectedTask.id)
+        .then((updatedTask) => {
+          setSelectedTask(updatedTask);
+          upsertTask(updatedTask);
+        })
+        .catch((err: Error) => setError(err.message));
+    }, 1200);
+
+    return () => window.clearInterval(timer);
+  }, [selectedTask?.id, selectedTask?.status]);
+
   const taskStats = useMemo(() => {
     const completed = tasks.filter((task) => task.status === "completed").length;
+    const active = tasks.filter((task) => ["pending", "processing"].includes(task.status)).length;
     return {
       total: tasks.length,
-      completed
+      completed,
+      active
     };
   }, [tasks]);
+
+  function upsertTask(updatedTask: StudyTask) {
+    setTasks((current) => {
+      const exists = current.some((task) => task.id === updatedTask.id);
+      if (!exists) {
+        return [updatedTask, ...current];
+      }
+      return current.map((task) => (task.id === updatedTask.id ? updatedTask : task));
+    });
+  }
 
   async function handleCreateCourse(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,13 +115,29 @@ function App() {
             source_type: "text"
           });
 
-      setTasks((current) => [createdTask, ...current]);
+      upsertTask(createdTask);
       setSelectedTask(createdTask);
       setFile(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate study package.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteTask(taskId: string) {
+    try {
+      setError("");
+      await deleteStudyTask(taskId);
+      setTasks((current) => {
+        const nextTasks = current.filter((task) => task.id !== taskId);
+        if (selectedTask?.id === taskId) {
+          setSelectedTask(nextTasks[0] ?? null);
+        }
+        return nextTasks;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove task.");
     }
   }
 
@@ -107,6 +154,10 @@ function App() {
             <div>
               <strong>{taskStats.total}</strong>
               <span>Tasks</span>
+            </div>
+            <div>
+              <strong>{taskStats.active}</strong>
+              <span>Running</span>
             </div>
             <div>
               <strong>{taskStats.completed}</strong>
@@ -163,22 +214,34 @@ function App() {
             />
 
             <button className="primary-button" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Generating..." : "Generate study package"}
+              {isSubmitting ? (
+                <span className="button-loading">
+                  <span className="button-spinner" aria-hidden="true" />
+                  Generating...
+                </span>
+              ) : (
+                "Generate study package"
+              )}
             </button>
           </form>
 
           <div className="task-list">
             <h2>Recent tasks</h2>
             {tasks.map((task) => (
-              <button
-                key={task.id}
-                className={task.id === selectedTask?.id ? "task-item active" : "task-item"}
-                type="button"
-                onClick={() => setSelectedTask(task)}
-              >
-                <span>{task.title}</span>
-                <small>{task.status}</small>
-              </button>
+              <div key={task.id} className={task.id === selectedTask?.id ? "task-row active" : "task-row"}>
+                <button className="task-item" type="button" onClick={() => setSelectedTask(task)}>
+                  <span>{task.title}</span>
+                  <small>{task.status}</small>
+                </button>
+                <button
+                  aria-label={`Remove ${task.title}`}
+                  className="remove-task-button"
+                  type="button"
+                  onClick={() => handleDeleteTask(task.id)}
+                >
+                  Remove
+                </button>
+              </div>
             ))}
           </div>
         </aside>

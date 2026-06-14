@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 
 from backend.app.models.entities import TaskStatus
 
@@ -12,6 +13,8 @@ class CourseCreate(BaseModel):
 
 
 class CourseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     description: str
@@ -28,6 +31,8 @@ class StudyTaskCreate(BaseModel):
 
 
 class StudyTaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     title: str
     course_id: str | None

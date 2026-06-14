@@ -9,6 +9,8 @@ export type QuizQuestion = {
   question: string;
   answer: string;
   topic: string;
+  options?: string[];
+  correct_option?: string;
 };
 
 export type StudyPlanDay = {

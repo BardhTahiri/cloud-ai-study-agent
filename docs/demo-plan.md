@@ -19,7 +19,8 @@ Current MVP shortcut:
 2. Start frontend.
 3. Use the sample material already shown in the dashboard.
 4. Click Generate study package.
-5. Show generated topics, summary, quiz, and plan.
+5. Show the task appearing as pending/running.
+6. Wait for the dashboard to poll and display generated topics, summary, quiz, and plan.
 ```
 
 Optional advanced demo:

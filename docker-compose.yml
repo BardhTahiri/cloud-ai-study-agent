@@ -7,9 +7,10 @@ services:
       - "8000:8000"
     environment:
       FRONTEND_URL: http://localhost:5173
+      DATABASE_URL: sqlite:////app/storage/cloud_ai_study_agent.db
       LOCAL_STORAGE_PATH: /app/storage/uploads
     volumes:
-      - ./storage/uploads:/app/storage/uploads
+      - ./storage:/app/storage
 
   frontend:
     build:

@@ -34,11 +34,26 @@ export function listStudyTasks(): Promise<StudyTask[]> {
   return request<StudyTask[]>("/study-tasks");
 }
 
+export function getStudyTask(taskId: string): Promise<StudyTask> {
+  return request<StudyTask>(`/study-tasks/${taskId}`);
+}
+
 export function createStudyTask(payload: StudyTaskPayload): Promise<StudyTask> {
   return request<StudyTask>("/study-tasks", {
     method: "POST",
     body: JSON.stringify(payload)
   });
+}
+
+export async function deleteStudyTask(taskId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/study-tasks/${taskId}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Delete failed with status ${response.status}`);
+  }
 }
 
 export async function uploadStudyMaterial(payload: {

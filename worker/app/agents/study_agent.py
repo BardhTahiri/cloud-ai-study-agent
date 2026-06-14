@@ -19,12 +19,16 @@ class QuizQuestion:
     question: str
     answer: str
     topic: str
+    options: list[str]
+    correct_option: str
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "question": self.question,
             "answer": self.answer,
             "topic": self.topic,
+            "options": self.options,
+            "correct_option": self.correct_option,
         }
 
 
@@ -85,11 +89,14 @@ def _generate_quiz(topics: list[str], summary: list[str]) -> list[QuizQuestion]:
 
     for index, topic in enumerate(topics[:6], start=1):
         answer = _find_sentence_for_topic(topic, summary) or fallback_answer
+        options = _build_quiz_options(topic, answer, index)
         questions.append(
             QuizQuestion(
-                question=f"{index}. Explain why '{topic}' is important in this material.",
+                question=f"{index}. Which option best explains '{topic}' based on the material?",
                 answer=answer,
                 topic=topic,
+                options=options,
+                correct_option=answer,
             )
         )
 
@@ -99,6 +106,8 @@ def _generate_quiz(topics: list[str], summary: list[str]) -> list[QuizQuestion]:
                 question="1. What is the main idea of this material?",
                 answer=fallback_answer,
                 topic="Main Idea",
+                options=_build_quiz_options("Main Idea", fallback_answer, 1),
+                correct_option=fallback_answer,
             )
         )
 
@@ -138,6 +147,17 @@ def _find_sentence_for_topic(topic: str, sentences: list[str]) -> str | None:
         if topic_lower in sentence.lower():
             return sentence
     return None
+
+
+def _build_quiz_options(topic: str, answer: str, index: int) -> list[str]:
+    distractors = [
+        f"{topic} is not connected to the uploaded material and can be skipped.",
+        f"{topic} only matters for visual design and not for understanding the lesson.",
+        f"{topic} is mainly about memorizing words without applying the concept.",
+    ]
+    options = [answer, *distractors]
+    shift = index % len(options)
+    return options[shift:] + options[:shift]
 
 
 def _review_task(day_index: int, summary: list[str]) -> str:

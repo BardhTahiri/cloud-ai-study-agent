@@ -18,6 +18,8 @@ build/
 # Local uploads
 storage/uploads/*
 !storage/uploads/.gitkeep
+storage/*.db
+storage/*.db-*
 
 # Logs and caches
 *.log
