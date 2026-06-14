@@ -12,6 +12,16 @@ Minimum demo path:
 7. Display generated study plan.
 ```
 
+Current MVP shortcut:
+
+```text
+1. Start backend.
+2. Start frontend.
+3. Use the sample material already shown in the dashboard.
+4. Click Generate study package.
+5. Show generated topics, summary, quiz, and plan.
+```
+
 Optional advanced demo:
 
 ```text
