@@ -6,6 +6,7 @@ from backend.app.db.session import get_db
 from backend.app.schemas.study import StudyTaskCreate, StudyTaskResponse
 from backend.app.services import study_service
 from backend.app.services.file_service import extract_text_from_upload
+from backend.app.services.task_dispatcher import dispatch_study_task
 
 router = APIRouter(prefix="/study-tasks", tags=["study tasks"])
 
@@ -32,7 +33,7 @@ def create_task(
     db: Session = Depends(get_db),
 ):
     task = study_service.create_study_task(db, payload)
-    background_tasks.add_task(study_service.run_study_task, task.id)
+    dispatch_study_task(task, background_tasks, db)
     return task
 
 
@@ -59,5 +60,5 @@ async def create_task_from_upload(
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
 
     task = study_service.create_study_task(db, payload)
-    background_tasks.add_task(study_service.run_study_task, task.id)
+    dispatch_study_task(task, background_tasks, db)
     return task

@@ -7,12 +7,13 @@ Cloud-based AI study assistant that processes academic materials and generates:
 - study plans
 - important topics
 
-The current version is a local MVP that keeps the cloud-agent structure visible:
+The current version uses a hybrid cloud-agent workflow:
 
-- `backend` exposes the API and creates study tasks.
-- `worker` acts as the first AI agent/background processor.
-- `frontend` gives the student a dashboard for generating outputs.
-- generated results are stored in a local SQLite database by default.
+- `frontend`, `backend`, uploaded files, and the permanent database remain local.
+- the local backend sends extracted material to an authenticated cloud agent API.
+- Redis carries temporary cloud jobs and results.
+- a Celery worker generates the study package without access to the local database.
+- the local backend copies completed results into its local database.
 
 ## Planned Structure
 
@@ -37,13 +38,16 @@ v
 Backend creates a processing task
 |
 v
-Background study agent extracts and analyzes the content
+Local backend sends extracted text to the cloud agent
+|
+v
+Cloud worker analyzes the content
 |
 v
 System generates summary, quiz, and study plan
 |
 v
-Results are saved and shown in the student dashboard
+Results return to the local database and student dashboard
 ```
 
 ## Run Locally
@@ -73,9 +77,9 @@ Then open:
 http://localhost:5173
 ```
 
-## Run With PostgreSQL
+## Simulate The Hybrid Stack
 
-The Docker stack includes PostgreSQL:
+Docker Compose starts the local application and a local simulation of the cloud agent:
 
 ```bash
 docker compose up --build
@@ -86,6 +90,38 @@ Backend health should show the active database:
 ```text
 http://localhost:8000/health
 ```
+
+The backend submits a remote-style job to `agent-api`. The Celery worker processes it independently, and frontend polling copies the completed result into PostgreSQL.
+
+## Select The Study Agent
+
+The implementation is selected from `LLM_BASE_URL`. The other model settings can remain configured while you switch the URL.
+
+Offline generator, with no API cost or model server:
+
+```env
+LLM_BASE_URL=
+```
+
+Free/local OpenAI-compatible model, such as Ollama running on the Docker host:
+
+```env
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+FREE_LLM_MODEL=qwen3:8b
+LLM_API_KEY=
+```
+
+For an OpenAI-compatible cloud endpoint, use that provider's `/v1` URL, free model name, and API key in the same variables.
+
+Paid OpenAI agent:
+
+```env
+LLM_BASE_URL=https://api.openai.com/v1
+PAID_LLM_MODEL=gpt-5.6-sol
+OPENAI_API_KEY=your_key_here
+```
+
+By default, a provider error falls back to the offline generator and records that fact in the result. Set `LLM_FALLBACK_TO_OFFLINE=false` when a provider error should fail the task instead.
 
 ## MVP Features
 
@@ -99,12 +135,11 @@ http://localhost:8000/health
 - view recent study tasks
 - persist courses and tasks in SQLite
 - poll task status while background processing finishes
+- process remote agent jobs through an authenticated API, Redis, and Celery
+- switch between free and paid model agents using the endpoint URL
 
 ## Next Implementation Steps
 
-- add Redis/Celery queue for real background jobs
-- move the SQLite database URL to PostgreSQL for cloud deployment
 - add authentication
-- connect the worker to an LLM provider
 - add RAG/vector search for uploaded materials
-- deploy backend and worker as cloud containers
+- deploy only the agent API and worker as Azure Container Apps

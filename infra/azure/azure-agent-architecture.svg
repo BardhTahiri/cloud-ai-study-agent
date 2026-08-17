@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1050" viewBox="0 0 1600 1050" role="img" aria-labelledby="title desc">
+  <title id="title">Cloud AI Study Agent Azure architecture</title>
+  <desc id="desc">Architecture showing the local frontend, backend, and PostgreSQL database connected to an Azure-hosted agent API, Redis queue, and Celery worker.</desc>
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1674d1"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16845b"/>
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#627386"/>
+    </marker>
+    <style>
+      .title { font: 700 34px "Segoe UI", Arial, sans-serif; fill: #142437; }
+      .subtitle { font: 400 18px "Segoe UI", Arial, sans-serif; fill: #536477; }
+      .zone-title { font: 700 22px "Segoe UI", Arial, sans-serif; fill: #142437; }
+      .region { font: 600 15px "Segoe UI", Arial, sans-serif; fill: #536477; }
+      .box-title { font: 700 19px "Segoe UI", Arial, sans-serif; fill: #142437; }
+      .body { font: 400 15px "Segoe UI", Arial, sans-serif; fill: #405267; }
+      .small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #536477; }
+      .flow { font: 600 14px "Segoe UI", Arial, sans-serif; fill: #1667ad; }
+      .status { font: 700 13px "Segoe UI", Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1050" fill="#f7f9fc"/>
+  <text class="title" x="42" y="52">Cloud AI Study Agent Architecture</text>
+  <text class="subtitle" x="42" y="82">Current deployment: local application with AI processing hosted in Microsoft Azure</text>
+
+  <!-- Local application -->
+  <rect x="40" y="115" width="415" height="875" rx="8" fill="#ffffff" stroke="#a8b5c3" stroke-width="2"/>
+  <rect x="40" y="115" width="415" height="54" rx="8" fill="#edf2f7"/>
+  <rect x="40" y="153" width="415" height="16" fill="#edf2f7"/>
+  <text class="zone-title" x="66" y="150">Local computer</text>
+
+  <rect x="78" y="205" width="338" height="120" rx="8" fill="#f4f8ff" stroke="#68a7df" stroke-width="2"/>
+  <circle cx="112" cy="239" r="17" fill="#1674d1"/>
+  <path d="M103 239h18M112 230v18" stroke="#ffffff" stroke-width="2"/>
+  <text class="box-title" x="142" y="245">Student + React frontend</text>
+  <text class="body" x="102" y="280">Uploads PDF and enters study prompt</text>
+  <text class="small" x="102" y="304">Runs locally in the browser</text>
+
+  <line x1="247" y1="325" x2="247" y2="375" stroke="#1674d1" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <text class="flow" x="263" y="356">1. Submit material</text>
+
+  <rect x="78" y="380" width="338" height="175" rx="8" fill="#f4f8ff" stroke="#68a7df" stroke-width="2"/>
+  <rect x="99" y="405" width="42" height="42" rx="6" fill="#1674d1"/>
+  <path d="M108 417h24M108 426h24M108 435h16" stroke="#ffffff" stroke-width="3"/>
+  <text class="box-title" x="157" y="432">FastAPI backend</text>
+  <text class="body" x="102" y="475">Extracts text from the PDF</text>
+  <text class="body" x="102" y="500">Sends text to the cloud agent</text>
+  <text class="body" x="102" y="525">Polls results and stores them locally</text>
+
+  <line x1="247" y1="555" x2="247" y2="655" stroke="#16845b" stroke-width="3" marker-end="url(#arrow-green)"/>
+  <text class="flow" x="263" y="610">7. Save completed package</text>
+
+  <rect x="78" y="660" width="338" height="145" rx="8" fill="#f2fbf7" stroke="#4da984" stroke-width="2"/>
+  <ellipse cx="121" cy="697" rx="25" ry="10" fill="#16845b"/>
+  <path d="M96 697v33c0 6 11 10 25 10s25-4 25-10v-33" fill="#16845b"/>
+  <ellipse cx="121" cy="730" rx="25" ry="10" fill="#126d4c"/>
+  <text class="box-title" x="164" y="704">PostgreSQL</text>
+  <text class="body" x="102" y="770">Permanent courses, tasks, and results</text>
+
+  <rect x="78" y="850" width="338" height="96" rx="8" fill="#fff8e8" stroke="#d69b28" stroke-width="2" stroke-dasharray="8 6"/>
+  <text class="box-title" x="102" y="885">Remaining integration test</text>
+  <text class="body" x="102" y="916">Real PDF through UI to local database</text>
+
+  <!-- Azure resource group -->
+  <rect x="500" y="115" width="1060" height="875" rx="8" fill="#ffffff" stroke="#1674d1" stroke-width="3"/>
+  <rect x="500" y="115" width="1060" height="54" rx="8" fill="#eaf4ff"/>
+  <rect x="500" y="153" width="1060" height="16" fill="#eaf4ff"/>
+  <text class="zone-title" x="526" y="150">Azure resource group: cloud-ai-study-rg</text>
+
+  <!-- Support resources -->
+  <rect x="540" y="205" width="280" height="112" rx="8" fill="#f4f8ff" stroke="#68a7df" stroke-width="2"/>
+  <text class="box-title" x="565" y="241">Container Registry</text>
+  <text class="body" x="565" y="271">cloudaistudyrg.azurecr.io</text>
+  <text class="small" x="565" y="296">Image: cloud-ai-agent:v2</text>
+
+  <rect x="850" y="205" width="280" height="112" rx="8" fill="#f4f8ff" stroke="#68a7df" stroke-width="2"/>
+  <text class="box-title" x="875" y="241">Managed identity</text>
+  <text class="body" x="875" y="271">cloud-ai-agent-pull-id</text>
+  <text class="small" x="875" y="296">AcrPull permission</text>
+
+  <rect x="1160" y="205" width="350" height="112" rx="8" fill="#f6f6f8" stroke="#9ba7b5" stroke-width="2"/>
+  <text class="box-title" x="1185" y="241">Log Analytics</text>
+  <text class="body" x="1185" y="271">Container logs and diagnostics</text>
+  <text class="small" x="1185" y="296">Sweden Central</text>
+
+  <!-- Container Apps environment -->
+  <rect x="540" y="360" width="680" height="420" rx="8" fill="#f8fbff" stroke="#4796d2" stroke-width="2" stroke-dasharray="10 6"/>
+  <text class="zone-title" x="565" y="397">Container Apps environment</text>
+  <text class="region" x="565" y="423">cloud-ai-agent-env | Sweden Central | Consumption</text>
+
+  <rect x="575" y="465" width="280" height="190" rx="8" fill="#edf7ff" stroke="#1674d1" stroke-width="3"/>
+  <rect x="596" y="488" width="76" height="27" rx="6" fill="#16845b"/>
+  <text class="status" x="610" y="507" fill="#ffffff">RUNNING</text>
+  <text class="box-title" x="596" y="548">Agent API</text>
+  <text class="body" x="596" y="578">External HTTPS ingress</text>
+  <text class="body" x="596" y="603">API-key authentication</text>
+  <text class="small" x="596" y="631">Scale: 0-1 replicas | Port 8010</text>
+
+  <rect x="905" y="465" width="280" height="190" rx="8" fill="#f2fbf7" stroke="#16845b" stroke-width="3"/>
+  <rect x="926" y="488" width="76" height="27" rx="6" fill="#16845b"/>
+  <text class="status" x="940" y="507" fill="#ffffff">RUNNING</text>
+  <text class="box-title" x="926" y="548">Celery worker</text>
+  <text class="body" x="926" y="578">Consumes queued study jobs</text>
+  <text class="body" x="926" y="603">Generates the study package</text>
+  <text class="small" x="926" y="631">No ingress | 1 replica</text>
+
+  <rect x="575" y="692" width="610" height="58" rx="8" fill="#fff8e8" stroke="#d69b28" stroke-width="2"/>
+  <text class="body" x="596" y="717">Generation mode active now: offline deterministic rules</text>
+  <text class="small" x="596" y="739">Free and paid LLM provider URLs are not configured yet</text>
+
+  <!-- Redis -->
+  <rect x="1280" y="420" width="230" height="260" rx="8" fill="#fff3f1" stroke="#d65343" stroke-width="3"/>
+  <rect x="1303" y="443" width="76" height="27" rx="6" fill="#16845b"/>
+  <text class="status" x="1317" y="462" fill="#ffffff">RUNNING</text>
+  <text class="box-title" x="1303" y="504">Azure Managed Redis</text>
+  <text class="region" x="1303" y="532">Germany West Central</text>
+  <text class="body" x="1303" y="575">Temporary job queue</text>
+  <text class="body" x="1303" y="600">Progress and results</text>
+  <text class="small" x="1303" y="632">TLS port 10000</text>
+  <text class="small" x="1303" y="654">NoCluster database</text>
+
+  <!-- Runtime flow -->
+  <path d="M416 445 C500 445 510 535 575 535" fill="none" stroke="#1674d1" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <text class="flow" x="446" y="430">2. HTTPS + API key</text>
+
+  <path d="M855 535 C1035 400 1170 420 1280 500" fill="none" stroke="#1674d1" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <text class="flow" x="1050" y="408">3. Enqueue</text>
+
+  <path d="M1280 580 C1245 580 1225 580 1185 580" fill="none" stroke="#16845b" stroke-width="4" marker-end="url(#arrow-green)"/>
+  <text class="flow" x="1205" y="566">4. Consume</text>
+
+  <path d="M1185 625 C1230 690 1255 690 1300 630" fill="none" stroke="#16845b" stroke-width="4" marker-end="url(#arrow-green)"/>
+  <text class="flow" x="1195" y="716">5. Write result</text>
+
+  <path d="M1280 660 C1130 820 820 825 680 655" fill="none" stroke="#1674d1" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <text class="flow" x="892" y="835">6. API reads status and result</text>
+
+  <path d="M575 605 C510 650 492 610 416 525" fill="none" stroke="#16845b" stroke-width="4" marker-end="url(#arrow-green)"/>
+
+  <!-- Deployment and telemetry relationships -->
+  <path d="M680 317 L680 465" fill="none" stroke="#627386" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow-gray)"/>
+  <path d="M735 317 C800 350 940 350 990 465" fill="none" stroke="#627386" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow-gray)"/>
+  <path d="M990 317 C930 350 790 350 750 465" fill="none" stroke="#627386" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow-gray)"/>
+  <path d="M1030 317 L1030 465" fill="none" stroke="#627386" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow-gray)"/>
+  <path d="M1335 317 C1335 350 1170 350 1120 465" fill="none" stroke="#627386" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow-gray)"/>
+
+  <!-- Completion badge -->
+  <rect x="540" y="880" width="970" height="68" rx="8" fill="#e9f8f1" stroke="#16845b" stroke-width="2"/>
+  <circle cx="575" cy="914" r="18" fill="#16845b"/>
+  <path d="M566 914l6 6 12-14" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="box-title" x="608" y="909">Azure cloud agent processing: completed and verified</text>
+  <text class="body" x="608" y="934">Test job reached 100% and returned summary, quiz, and study plan without errors.</text>
+</svg>

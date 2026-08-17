@@ -150,8 +150,8 @@ function App() {
           <p>Generate summaries, quizzes, important topics, and study plans from your own material.</p>
         </div>
         <div className="database-badge">
-          <span>Persistent database</span>
-          <strong>SQLite now, PostgreSQL later</strong>
+          <span>Hybrid architecture</span>
+          <strong>Local data, cloud AI agent</strong>
         </div>
       </header>
 

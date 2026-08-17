@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS study_tasks (
     material_text TEXT NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'pending',
     progress INTEGER NOT NULL DEFAULT 0,
+    agent_job_id VARCHAR(255),
     result JSON,
     error TEXT,
     created_at TIMESTAMP NOT NULL,
@@ -28,4 +29,5 @@ CREATE TABLE IF NOT EXISTS study_tasks (
 CREATE INDEX IF NOT EXISTS ix_courses_created_at ON courses(created_at);
 CREATE INDEX IF NOT EXISTS ix_study_tasks_course_id ON study_tasks(course_id);
 CREATE INDEX IF NOT EXISTS ix_study_tasks_status ON study_tasks(status);
+CREATE INDEX IF NOT EXISTS ix_study_tasks_agent_job_id ON study_tasks(agent_job_id);
 CREATE INDEX IF NOT EXISTS ix_study_tasks_created_at ON study_tasks(created_at);

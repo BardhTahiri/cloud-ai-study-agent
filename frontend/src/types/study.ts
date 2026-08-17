@@ -25,6 +25,12 @@ export type StudyResult = {
   summary: string[];
   quiz: QuizQuestion[];
   study_plan: StudyPlanDay[];
+  generation?: {
+    tier: "offline" | "free" | "paid";
+    provider: string;
+    model: string;
+    fallback_reason?: string | null;
+  };
 };
 
 export type StudyTask = {

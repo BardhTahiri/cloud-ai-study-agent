@@ -1,168 +1,116 @@
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
-from math import ceil
-from typing import Any
+from urllib.parse import urlparse
 
-from worker.app.processors.text_processor import extract_topics, normalize_text, select_key_sentences
-
-
-@dataclass
-class StudyInput:
-    title: str
-    prompt: str
-    material_text: str
+from worker.app.agents.contracts import GenerationMetadata, StudyInput, StudyOutput, StudyPackage
+from worker.app.agents.deterministic_agent import generate_deterministic_package
+from worker.app.agents.llm_agent import FreeCompatibleStudyAgent, LlmAgentConfig, PaidOpenAIStudyAgent
 
 
-@dataclass
-class QuizQuestion:
-    question: str
-    answer: str
-    topic: str
-    options: list[str]
-    correct_option: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "question": self.question,
-            "answer": self.answer,
-            "topic": self.topic,
-            "options": self.options,
-            "correct_option": self.correct_option,
-        }
+logger = logging.getLogger(__name__)
 
 
-@dataclass
-class StudyPlanDay:
-    day: int
-    focus: str
-    tasks: list[str]
+@dataclass(frozen=True)
+class AgentSettings:
+    base_url: str
+    free_model: str
+    paid_model: str
+    free_api_key: str
+    openai_api_key: str
+    timeout_seconds: float
+    max_input_chars: int
+    fallback_to_offline: bool
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "day": self.day,
-            "focus": self.focus,
-            "tasks": self.tasks,
-        }
-
-
-@dataclass
-class StudyOutput:
-    title: str
-    important_topics: list[str]
-    summary: list[str]
-    quiz: list[QuizQuestion]
-    study_plan: list[StudyPlanDay]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "title": self.title,
-            "important_topics": self.important_topics,
-            "summary": self.summary,
-            "quiz": [question.to_dict() for question in self.quiz],
-            "study_plan": [day.to_dict() for day in self.study_plan],
-        }
+    @classmethod
+    def from_env(cls) -> "AgentSettings":
+        return cls(
+            base_url=os.getenv("LLM_BASE_URL", "").strip().rstrip("/"),
+            free_model=os.getenv("FREE_LLM_MODEL", "qwen3:8b"),
+            paid_model=os.getenv("PAID_LLM_MODEL", "gpt-5.6-sol"),
+            free_api_key=os.getenv("LLM_API_KEY", ""),
+            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+            timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
+            max_input_chars=int(os.getenv("LLM_MAX_INPUT_CHARS", "100000")),
+            fallback_to_offline=_env_bool("LLM_FALLBACK_TO_OFFLINE", default=True),
+        )
 
 
 def generate_study_package(study_input: StudyInput) -> StudyOutput:
-    material = normalize_text(study_input.material_text)
-    if len(material) < 30:
-        raise ValueError("Material is too short to generate a study package.")
+    settings = AgentSettings.from_env()
+    tier = detect_agent_tier(settings.base_url)
 
-    topics = extract_topics(f"{study_input.prompt} {material}", limit=8)
-    summary = select_key_sentences(material, topics, study_input.prompt, limit=5)
-    quiz = _generate_quiz(topics, summary)
-    study_plan = _generate_study_plan(topics, summary)
+    if tier == "offline":
+        package = generate_deterministic_package(study_input)
+        return _with_metadata(package, "offline", "deterministic", "local-rules")
 
+    try:
+        agent = _build_llm_agent(settings, tier)
+        package = agent.generate(study_input)
+        return _with_metadata(package, agent.tier, agent.provider, agent.model)
+    except Exception as exc:
+        if not settings.fallback_to_offline:
+            raise RuntimeError(f"{tier.capitalize()} study agent failed: {exc}") from exc
+
+        logger.exception("Configured %s study agent failed; using the offline generator.", tier)
+        package = generate_deterministic_package(study_input)
+        reason = f"{exc.__class__.__name__}: {str(exc)[:300]}"
+        return _with_metadata(package, "offline", "deterministic", "local-rules", reason)
+
+
+def detect_agent_tier(base_url: str) -> str:
+    if not base_url:
+        return "offline"
+
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("LLM_BASE_URL must be an absolute http or https URL.")
+    return "paid" if parsed.hostname.lower() == "api.openai.com" else "free"
+
+
+def _build_llm_agent(settings: AgentSettings, tier: str):
+    if tier == "paid":
+        config = LlmAgentConfig(
+            base_url=settings.base_url,
+            model=settings.paid_model,
+            api_key=settings.openai_api_key,
+            timeout_seconds=settings.timeout_seconds,
+            max_input_chars=settings.max_input_chars,
+        )
+        return PaidOpenAIStudyAgent(config)
+
+    config = LlmAgentConfig(
+        base_url=settings.base_url,
+        model=settings.free_model,
+        api_key=settings.free_api_key,
+        timeout_seconds=settings.timeout_seconds,
+        max_input_chars=settings.max_input_chars,
+    )
+    return FreeCompatibleStudyAgent(config)
+
+
+def _with_metadata(
+    package: StudyPackage,
+    tier: str,
+    provider: str,
+    model: str,
+    fallback_reason: str | None = None,
+) -> StudyOutput:
     return StudyOutput(
-        title=study_input.title,
-        important_topics=topics,
-        summary=summary,
-        quiz=quiz,
-        study_plan=study_plan,
+        **package.model_dump(),
+        generation=GenerationMetadata(
+            tier=tier,
+            provider=provider,
+            model=model,
+            fallback_reason=fallback_reason,
+        ),
     )
 
 
-def _generate_quiz(topics: list[str], summary: list[str]) -> list[QuizQuestion]:
-    questions: list[QuizQuestion] = []
-    fallback_answer = summary[0] if summary else "Review the uploaded material and explain the topic in your own words."
-
-    for index, topic in enumerate(topics[:6], start=1):
-        answer = _find_sentence_for_topic(topic, summary) or fallback_answer
-        options = _build_quiz_options(topic, answer, index)
-        questions.append(
-            QuizQuestion(
-                question=f"{index}. Which option best explains '{topic}' based on the material?",
-                answer=answer,
-                topic=topic,
-                options=options,
-                correct_option=answer,
-            )
-        )
-
-    if not questions:
-        questions.append(
-            QuizQuestion(
-                question="1. What is the main idea of this material?",
-                answer=fallback_answer,
-                topic="Main Idea",
-                options=_build_quiz_options("Main Idea", fallback_answer, 1),
-                correct_option=fallback_answer,
-            )
-        )
-
-    return questions
-
-
-def _generate_study_plan(topics: list[str], summary: list[str]) -> list[StudyPlanDay]:
-    if not topics:
-        topics = ["Main Idea", "Key Concepts", "Review"]
-
-    day_count = min(max(ceil(len(topics) / 2), 3), 5)
-    chunk_size = ceil(len(topics) / day_count)
-    days: list[StudyPlanDay] = []
-
-    for day in range(day_count):
-        day_topics = topics[day * chunk_size : (day + 1) * chunk_size] or topics[-1:]
-        focus = ", ".join(day_topics)
-        days.append(
-            StudyPlanDay(
-                day=day + 1,
-                focus=focus,
-                tasks=[
-                    f"Read the section related to {focus}.",
-                    "Write a short explanation using your own words.",
-                    "Answer the generated quiz questions for this focus area.",
-                    _review_task(day, summary),
-                ],
-            )
-        )
-
-    return days
-
-
-def _find_sentence_for_topic(topic: str, sentences: list[str]) -> str | None:
-    topic_lower = topic.lower()
-    for sentence in sentences:
-        if topic_lower in sentence.lower():
-            return sentence
-    return None
-
-
-def _build_quiz_options(topic: str, answer: str, index: int) -> list[str]:
-    distractors = [
-        f"{topic} is not connected to the uploaded material and can be skipped.",
-        f"{topic} only matters for visual design and not for understanding the lesson.",
-        f"{topic} is mainly about memorizing words without applying the concept.",
-    ]
-    options = [answer, *distractors]
-    shift = index % len(options)
-    return options[shift:] + options[:shift]
-
-
-def _review_task(day_index: int, summary: list[str]) -> str:
-    if not summary:
-        return "Create one example that connects the topic to a real academic problem."
-
-    sentence = summary[min(day_index, len(summary) - 1)]
-    return f"Review this key point: {sentence}"
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, inspect, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.core.config import settings
@@ -52,8 +52,21 @@ if database_url.startswith("sqlite"):
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    _ensure_study_task_columns()
     with SessionLocal() as db:
         _seed_default_course(db)
+
+
+def _ensure_study_task_columns() -> None:
+    columns = {column["name"] for column in inspect(engine).get_columns("study_tasks")}
+    if "agent_job_id" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE study_tasks ADD COLUMN agent_job_id VARCHAR(255)"))
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_study_tasks_agent_job_id ON study_tasks(agent_job_id)")
+        )
 
 
 def _seed_default_course(db: Session) -> None:

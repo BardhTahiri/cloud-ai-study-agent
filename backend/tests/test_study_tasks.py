@@ -1,9 +1,14 @@
 import os
 
 os.environ["DATABASE_URL"] = "sqlite:///./storage/test_cloud_ai_study_agent.db"
+os.environ["TASK_QUEUE_MODE"] = "local"
+os.environ["LLM_BASE_URL"] = ""
 
 from backend.app.main import app
+from backend.app.core.config import settings
 from backend.app.schemas.study import StudyTaskCreate
+from backend.app.services import study_service, task_dispatcher
+from backend.app.services.cloud_agent_client import CloudAgentJob
 from backend.app.services.file_service import clean_extracted_text
 from fastapi.testclient import TestClient
 
@@ -37,6 +42,7 @@ def test_create_study_task():
         assert len(payload["result"]["quiz"][0]["options"]) == 4
         assert payload["result"]["quiz"][0]["correct_option"] in payload["result"]["quiz"][0]["options"]
         assert payload["result"]["study_plan"]
+        assert payload["result"]["generation"]["tier"] == "offline"
 
 
 def test_delete_study_task():
@@ -83,3 +89,75 @@ def test_clean_extracted_text_removes_invalid_unicode_for_uploads():
 
     assert "\udcff" not in payload.material_text
     assert "Artificial Intelligence" in payload.material_text
+
+
+def test_cloud_mode_submits_material_and_saves_remote_result(monkeypatch):
+    submitted_inputs = []
+    generated_result = {
+        "title": "Cloud Worker",
+        "important_topics": ["Remote jobs"],
+        "summary": ["The local backend delegates generation to a cloud worker."],
+        "quiz": [
+            {
+                "question": "Where does generation run?",
+                "answer": "In the cloud worker",
+                "topic": "Remote jobs",
+                "options": ["In the cloud worker", "In CSS", "In the browser cookie"],
+                "correct_option": "In the cloud worker",
+            }
+        ],
+        "study_plan": [{"day": 1, "focus": "Remote jobs", "tasks": ["Review the job flow."]}],
+        "generation": {
+            "tier": "offline",
+            "provider": "deterministic",
+            "model": "local-rules",
+            "fallback_reason": None,
+        },
+    }
+
+    class FakeCloudAgentClient:
+        def submit(self, study_input):
+            submitted_inputs.append(study_input)
+            return "agent-job-123"
+
+        def get_job(self, job_id):
+            assert job_id == "agent-job-123"
+            return CloudAgentJob(
+                job_id=job_id,
+                status="completed",
+                progress=100,
+                result=generated_result,
+            )
+
+    fake_client = FakeCloudAgentClient()
+    monkeypatch.setattr(settings, "task_queue_mode", "cloud")
+    monkeypatch.setattr(settings, "task_queue_fallback_local", False)
+    monkeypatch.setattr(task_dispatcher, "build_cloud_agent_client", lambda: fake_client)
+    monkeypatch.setattr(study_service, "build_cloud_agent_client", lambda: fake_client)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/study-tasks",
+            json={
+                "title": "Cloud Worker",
+                "prompt": "Focus on remote execution.",
+                "material_text": (
+                    "The local application sends study material to a cloud agent API. "
+                    "A background worker generates the package and returns it later."
+                ),
+                "source_type": "text",
+            },
+        )
+
+        assert response.status_code == 202
+        created = response.json()
+        assert created["status"] == "pending"
+        assert created["progress"] == 5
+        assert submitted_inputs[0].title == "Cloud Worker"
+        assert "cloud agent API" in submitted_inputs[0].material_text
+
+        task_response = client.get(f"/api/study-tasks/{created['id']}")
+        assert task_response.status_code == 200
+        completed = task_response.json()
+        assert completed["status"] == "completed"
+        assert completed["result"] == generated_result

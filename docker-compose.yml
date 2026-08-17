@@ -15,6 +15,33 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  agent-api:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    ports:
+      - "8010:8010"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      AGENT_API_KEY: ${AGENT_API_KEY:-local-agent-key}
+      AGENT_RESULT_EXPIRES_SECONDS: ${AGENT_RESULT_EXPIRES_SECONDS:-604800}
+    depends_on:
+      redis:
+        condition: service_healthy
+
   backend:
     build:
       context: .
@@ -25,10 +52,47 @@ services:
       FRONTEND_URL: http://localhost:5173
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-12345678}@postgres:5432/${POSTGRES_DB:-cloud_ai_study_agent}
       LOCAL_STORAGE_PATH: /app/storage/uploads
+      TASK_QUEUE_MODE: cloud
+      TASK_QUEUE_FALLBACK_LOCAL: ${TASK_QUEUE_FALLBACK_LOCAL:-true}
+      AGENT_BASE_URL: http://agent-api:8010
+      AGENT_API_KEY: ${AGENT_API_KEY:-local-agent-key}
+      AGENT_HTTP_TIMEOUT_SECONDS: ${AGENT_HTTP_TIMEOUT_SECONDS:-15}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FREE_LLM_MODEL: ${FREE_LLM_MODEL:-qwen3:8b}
+      PAID_LLM_MODEL: ${PAID_LLM_MODEL:-gpt-5.6-sol}
+      LLM_FALLBACK_TO_OFFLINE: ${LLM_FALLBACK_TO_OFFLINE:-true}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-120}
+      LLM_MAX_INPUT_CHARS: ${LLM_MAX_INPUT_CHARS:-100000}
     volumes:
       - ./storage:/app/storage
     depends_on:
       postgres:
+        condition: service_healthy
+      agent-api:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: ["celery", "-A", "worker.app.celery_app:celery_app", "worker", "--loglevel=info"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      AGENT_RESULT_EXPIRES_SECONDS: ${AGENT_RESULT_EXPIRES_SECONDS:-604800}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FREE_LLM_MODEL: ${FREE_LLM_MODEL:-qwen3:8b}
+      PAID_LLM_MODEL: ${PAID_LLM_MODEL:-gpt-5.6-sol}
+      LLM_FALLBACK_TO_OFFLINE: ${LLM_FALLBACK_TO_OFFLINE:-true}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-120}
+      LLM_MAX_INPUT_CHARS: ${LLM_MAX_INPUT_CHARS:-100000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
         condition: service_healthy
 
   frontend:
@@ -44,3 +108,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
