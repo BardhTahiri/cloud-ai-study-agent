@@ -75,3 +75,28 @@ def test_agent_api_submits_job_and_returns_result(monkeypatch):
     assert completed.status_code == 200
     assert completed.json()["status"] == "completed"
     assert completed.json()["result"] == STUDY_OUTPUT
+
+
+def test_agent_api_reports_provider_retry_as_processing(monkeypatch):
+    monkeypatch.setattr(agent_api.settings, "api_key", "test-secret")
+    retrying_result = SimpleNamespace(
+        state=states.RETRY,
+        info=RuntimeError("provider temporarily unavailable"),
+        result=None,
+    )
+    monkeypatch.setattr(agent_api.celery_app, "AsyncResult", lambda job_id: retrying_result)
+
+    with TestClient(agent_api.app) as client:
+        response = client.get(
+            "/jobs/retrying-job",
+            headers={"X-Agent-API-Key": "test-secret"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": "retrying-job",
+        "status": "processing",
+        "progress": 35,
+        "result": None,
+        "error": None,
+    }

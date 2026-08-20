@@ -146,7 +146,9 @@ docker compose --profile local-agent exec worker codex login --device-auth
 docker compose --profile local-agent exec worker codex login status
 ```
 
-The `codex_auth` Docker volume persists refreshed credentials. Treat that volume like a password. The Azure worker uses the same design with a private Azure Files mount at `/codex-auth`. By default, a provider error falls back to the offline generator and records that fact in the result. Set `LLM_FALLBACK_TO_OFFLINE=false` only while verifying a provider so errors fail visibly instead.
+The `codex_auth` Docker volume persists refreshed credentials. Treat that volume like a password. The Azure worker uses the same design with a private Azure Files mount at `/codex-auth`.
+
+Configured providers do not silently fall back to offline output. In cloud mode, temporary provider failures are retried every `AGENT_PROVIDER_RETRY_DELAY_SECONDS` for up to `AGENT_PROVIDER_MAX_RETRIES` attempts; the defaults are five minutes and 288 retries, or about 24 hours. Set `LLM_FALLBACK_TO_OFFLINE=true` only when deterministic fallback is explicitly desired. Azure continues processing while the local computer is off. The result remains in Redis for `AGENT_RESULT_EXPIRES_SECONDS` (seven days by default), and the backend copies it into PostgreSQL when the app is opened again.
 
 ## MVP Features
 

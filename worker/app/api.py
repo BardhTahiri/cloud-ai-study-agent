@@ -105,7 +105,9 @@ def _map_celery_state(state: str, info: Any) -> tuple[AgentJobStatus, int]:
     if state == "PROGRESS":
         progress = info.get("progress", 35) if isinstance(info, dict) else 35
         return "processing", max(1, min(int(progress), 99))
-    if state in {states.STARTED, states.RECEIVED, states.RETRY}:
+    if state == states.RETRY:
+        return "processing", 35
+    if state in {states.STARTED, states.RECEIVED}:
         return "processing", 25
     return "pending", 5
 

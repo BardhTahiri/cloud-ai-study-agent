@@ -93,7 +93,7 @@ export function TaskResult({ task }: TaskResultProps) {
           </div>
           <span className="eyebrow">Background agent active</span>
           <h3>{isProcessing ? "Creating your learning materials" : "Your request is in the queue"}</h3>
-          <p>The page updates automatically. You can leave this task open while the Azure worker processes it.</p>
+          <p>Azure keeps processing if you close this page or turn off this computer. Temporary model outages are retried automatically.</p>
 
           <div className="progress-block">
             <div className="progress-label">

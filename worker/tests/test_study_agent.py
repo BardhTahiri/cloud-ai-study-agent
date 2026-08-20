@@ -14,6 +14,7 @@ from worker.app.agents.llm_agent import (
 )
 from worker.app.agents.study_agent import (
     AgentSettings,
+    StudyAgentUnavailableError,
     StudyInput,
     _build_llm_agent,
     detect_agent_tier,
@@ -244,3 +245,25 @@ def test_codex_url_uses_subscription_agent_without_network(monkeypatch):
     assert output.generation.tier == "codex"
     assert output.generation.provider == "chatgpt-codex"
     assert output.generation.model == "test-codex-model"
+
+
+def test_provider_failure_is_retryable_when_offline_fallback_is_disabled(monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "codex://subscription")
+    monkeypatch.setenv("LLM_FALLBACK_TO_OFFLINE", "false")
+
+    def unavailable(self, study_input):
+        raise RuntimeError("configured model is temporarily unavailable")
+
+    monkeypatch.setattr(CodexSubscriptionStudyAgent, "generate", unavailable)
+
+    with pytest.raises(StudyAgentUnavailableError, match="temporarily unavailable"):
+        generate_study_package(
+            StudyInput(
+                title="Retry provider",
+                prompt="Focus on durable cloud jobs.",
+                material_text=(
+                    "Cloud queues preserve work while providers are temporarily unavailable. "
+                    "A worker can retry the request later without replacing the requested model."
+                ),
+            )
+        )

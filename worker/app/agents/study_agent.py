@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 CODEX_SUBSCRIPTION_URL = "codex://subscription"
 
 
+class StudyAgentUnavailableError(RuntimeError):
+    """A configured model provider failed and may recover on a later retry."""
+
+
 @dataclass(frozen=True)
 class AgentSettings:
     base_url: str
@@ -46,7 +50,7 @@ class AgentSettings:
             codex_timeout_seconds=float(os.getenv("CODEX_TIMEOUT_SECONDS", "300")),
             max_input_chars=int(os.getenv("LLM_MAX_INPUT_CHARS", "100000")),
             free_max_input_chars=int(os.getenv("FREE_LLM_MAX_INPUT_CHARS", "12000")),
-            fallback_to_offline=_env_bool("LLM_FALLBACK_TO_OFFLINE", default=True),
+            fallback_to_offline=_env_bool("LLM_FALLBACK_TO_OFFLINE", default=False),
         )
 
 
@@ -64,7 +68,9 @@ def generate_study_package(study_input: StudyInput) -> StudyOutput:
         return _with_metadata(package, agent.tier, agent.provider, agent.model)
     except Exception as exc:
         if not settings.fallback_to_offline:
-            raise RuntimeError(f"{tier.capitalize()} study agent failed: {exc}") from exc
+            raise StudyAgentUnavailableError(
+                f"{tier.capitalize()} study agent is temporarily unavailable: {exc}"
+            ) from exc
 
         logger.exception("Configured %s study agent failed; using the offline generator.", tier)
         package = generate_deterministic_package(study_input)
