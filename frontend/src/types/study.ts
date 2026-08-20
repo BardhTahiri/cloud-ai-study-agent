@@ -26,7 +26,7 @@ export type StudyResult = {
   quiz: QuizQuestion[];
   study_plan: StudyPlanDay[];
   generation?: {
-    tier: "offline" | "free" | "paid";
+    tier: "offline" | "free" | "codex";
     provider: string;
     model: string;
     fallback_reason?: string | null;

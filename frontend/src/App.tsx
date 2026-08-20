@@ -1,4 +1,18 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  AlertCircle,
+  BookOpenCheck,
+  CheckCircle2,
+  Cloud,
+  FileText,
+  Layers3,
+  Plus,
+  Sparkles,
+  Trash2,
+  UploadCloud,
+  X
+} from "lucide-react";
 
 import {
   createCourse,
@@ -14,6 +28,15 @@ import type { Course, StudyTask } from "./types/study";
 
 const sampleMaterial =
   "Cloud computing provides on-demand access to shared computing resources such as servers, storage, databases, networking, and software. It allows applications to scale based on demand and reduces the need for local infrastructure. A cloud-based AI study agent can process academic materials in the background, store task progress, and generate summaries, quizzes, and study plans even when the user closes the browser. Important concepts include cloud storage, background workers, queues, databases, monitoring, and AI-generated learning support.";
+
+function formatTaskDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
 
 function App() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -59,19 +82,13 @@ function App() {
   const taskStats = useMemo(() => {
     const completed = tasks.filter((task) => task.status === "completed").length;
     const active = tasks.filter((task) => ["pending", "processing"].includes(task.status)).length;
-    return {
-      total: tasks.length,
-      completed,
-      active
-    };
+    return { total: tasks.length, completed, active };
   }, [tasks]);
 
   function upsertTask(updatedTask: StudyTask) {
     setTasks((current) => {
       const exists = current.some((task) => task.id === updatedTask.id);
-      if (!exists) {
-        return [updatedTask, ...current];
-      }
+      if (!exists) return [updatedTask, ...current];
       return current.map((task) => (task.id === updatedTask.id ? updatedTask : task));
     });
   }
@@ -84,7 +101,7 @@ function App() {
       setError("");
       const course = await createCourse({
         name: newCourseName,
-        description: "Created from the demo dashboard."
+        description: "Created from the study dashboard."
       });
       setCourses((current) => [...current, course]);
       setCourseId(course.id);
@@ -101,12 +118,7 @@ function App() {
 
     try {
       const createdTask = file
-        ? await uploadStudyMaterial({
-            file,
-            title,
-            prompt,
-            courseId: courseId || undefined
-          })
+        ? await uploadStudyMaterial({ file, title, prompt, courseId: courseId || undefined })
         : await createStudyTask({
             title,
             prompt,
@@ -131,9 +143,7 @@ function App() {
       await deleteStudyTask(taskId);
       setTasks((current) => {
         const nextTasks = current.filter((task) => task.id !== taskId);
-        if (selectedTask?.id === taskId) {
-          setSelectedTask(nextTasks[0] ?? null);
-        }
+        if (selectedTask?.id === taskId) setSelectedTask(nextTasks[0] ?? null);
         return nextTasks;
       });
     } catch (err) {
@@ -144,103 +154,156 @@ function App() {
   return (
     <main className="app-shell">
       <header className="app-header">
-        <div>
-          <span className="eyebrow">Academic AI workspace</span>
-          <h1>Cloud AI Study Agent</h1>
-          <p>Generate summaries, quizzes, important topics, and study plans from your own material.</p>
+        <div className="app-brand">
+          <span className="brand-mark" aria-hidden="true">
+            <BookOpenCheck size={23} strokeWidth={2.2} />
+          </span>
+          <div>
+            <span className="product-kicker">AI learning workspace</span>
+            <h1>Cloud Study Agent</h1>
+          </div>
         </div>
-        <div className="database-badge">
-          <span>Hybrid architecture</span>
-          <strong>Local data, cloud AI agent</strong>
+
+        <div className="header-status">
+          <span className="mode-badge">
+            <span className="status-dot" aria-hidden="true" />
+            Hybrid agent mode
+          </span>
+          <div className="architecture-label">
+            <Cloud size={18} aria-hidden="true" />
+            <span>
+              <small>Architecture</small>
+              Local data + Azure AI
+            </span>
+          </div>
         </div>
       </header>
 
       <section className="workspace">
         <aside className="control-panel">
-          <div className="brand-block">
-            <span className="eyebrow">Study workflow</span>
-            <h1>Study package generator</h1>
-          </div>
-
-          <div className="stats-row">
-            <div>
-              <strong>{taskStats.total}</strong>
-              <span>Tasks</span>
+          <div className="panel-intro">
+            <div className="section-icon" aria-hidden="true">
+              <Sparkles size={18} />
             </div>
             <div>
-              <strong>{taskStats.active}</strong>
-              <span>Running</span>
-            </div>
-            <div>
-              <strong>{taskStats.completed}</strong>
-              <span>Completed</span>
+              <span className="eyebrow">New package</span>
+              <h2>Build your study session</h2>
+              <p>Turn course material into an exam-ready package.</p>
             </div>
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          <div className="stats-row" aria-label="Study task overview">
+            <div className="stat-item">
+              <Layers3 size={17} aria-hidden="true" />
+              <span><strong>{taskStats.total}</strong> Total</span>
+            </div>
+            <div className="stat-item">
+              <Activity size={17} aria-hidden="true" />
+              <span><strong>{taskStats.active}</strong> Running</span>
+            </div>
+            <div className="stat-item">
+              <CheckCircle2 size={17} aria-hidden="true" />
+              <span><strong>{taskStats.completed}</strong> Done</span>
+            </div>
+          </div>
 
-          <section className="panel-section">
+          {error && (
+            <div className="error-text" role="alert">
+              <AlertCircle size={17} aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <section className="panel-section course-section">
             <div className="section-heading">
-              <h2>Create course</h2>
-              <p>Group generated study packages by subject.</p>
+              <div>
+                <span className="section-label">Course library</span>
+                <p>Group packages by subject.</p>
+              </div>
             </div>
             <form className="inline-form" onSubmit={handleCreateCourse}>
-              <label htmlFor="new-course">New course</label>
+              <label className="visually-hidden" htmlFor="new-course">New course name</label>
               <div className="inline-row">
                 <input
                   id="new-course"
                   value={newCourseName}
                   onChange={(event) => setNewCourseName(event.target.value)}
-                  placeholder="e.g. Artificial Intelligence"
+                  placeholder="Add a new course"
                 />
-                <button type="submit">Add</button>
+                <button className="icon-text-button" type="submit" disabled={!newCourseName.trim()}>
+                  <Plus size={17} aria-hidden="true" />
+                  Add
+                </button>
               </div>
             </form>
           </section>
 
-          <section className="panel-section">
+          <section className="panel-section generator-section">
             <div className="section-heading">
-              <h2>Generate package</h2>
-              <p>Paste text or upload a file, then let the worker build the study output.</p>
+              <div>
+                <span className="section-label">Package details</span>
+                <p>Choose a course, goal, and source material.</p>
+              </div>
             </div>
             <form className="study-form" onSubmit={handleGenerate}>
-              <label htmlFor="course">Course</label>
-              <select id="course" value={courseId} onChange={(event) => setCourseId(event.target.value)}>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name}
-                  </option>
-                ))}
-              </select>
+              <div className="field-group">
+                <label htmlFor="course">Course</label>
+                <select id="course" value={courseId} onChange={(event) => setCourseId(event.target.value)}>
+                  <option value="">No course selected</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.id}>{course.name}</option>
+                  ))}
+                </select>
+              </div>
 
-              <label htmlFor="title">Study package title</label>
-              <input id="title" value={title} onChange={(event) => setTitle(event.target.value)} />
+              <div className="field-group">
+                <label htmlFor="title">Study package title</label>
+                <input id="title" value={title} onChange={(event) => setTitle(event.target.value)} required />
+              </div>
 
-              <label htmlFor="prompt">Prompt</label>
-              <textarea id="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} />
+              <div className="field-group">
+                <label htmlFor="prompt">Learning goal</label>
+                <textarea id="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} required />
+              </div>
 
-              <label htmlFor="material">Material text</label>
-              <textarea
-                id="material"
-                value={materialText}
-                onChange={(event) => setMaterialText(event.target.value)}
-                rows={9}
-                disabled={Boolean(file)}
-              />
-              <p className="field-hint">When a file is selected, the uploaded file will be used instead of pasted text.</p>
+              <div className="field-group">
+                <label htmlFor="material">Material text</label>
+                <textarea
+                  id="material"
+                  value={materialText}
+                  onChange={(event) => setMaterialText(event.target.value)}
+                  rows={7}
+                  disabled={Boolean(file)}
+                  required={!file}
+                />
+                <span className="field-hint">Paste text here or upload a PDF below.</span>
+              </div>
 
-              <label htmlFor="file">PDF or text file</label>
-              <input
-                id="file"
-                type="file"
-                accept=".pdf,.txt"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
+              <div className="field-group">
+                <span className="input-label">Source file</span>
+                <label className={file ? "file-drop has-file" : "file-drop"} htmlFor="file">
+                  <UploadCloud size={21} aria-hidden="true" />
+                  <span className="file-drop-copy">
+                    <strong>{file ? "File ready to process" : "Upload PDF or text"}</strong>
+                    <small>{file ? file.name : "PDF or TXT, one file at a time"}</small>
+                  </span>
+                  <span className="file-action">Browse</span>
+                </label>
+                <input
+                  className="visually-hidden"
+                  id="file"
+                  type="file"
+                  accept=".pdf,.txt"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+              </div>
+
               {file && (
                 <div className="selected-file">
+                  <FileText size={16} aria-hidden="true" />
                   <span>{file.name}</span>
-                  <button type="button" onClick={() => setFile(null)}>
-                    Clear
+                  <button type="button" onClick={() => setFile(null)} aria-label={`Clear ${file.name}`} title="Clear file">
+                    <X size={16} aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -249,35 +312,45 @@ function App() {
                 {isSubmitting ? (
                   <span className="button-loading">
                     <span className="button-spinner" aria-hidden="true" />
-                    Generating...
+                    Sending to agent...
                   </span>
                 ) : (
-                  "Generate study package"
+                  <>
+                    <Sparkles size={18} aria-hidden="true" />
+                    Generate study package
+                  </>
                 )}
               </button>
             </form>
           </section>
 
-          <section className="panel-section">
-            <div className="section-heading">
-              <h2>Recent tasks</h2>
-              <p>Stored in the database and available after refresh.</p>
+          <section className="panel-section recent-section">
+            <div className="section-heading task-heading">
+              <div>
+                <span className="section-label">Recent packages</span>
+                <p>Saved in your local database.</p>
+              </div>
+              <span className="count-badge">{tasks.length}</span>
             </div>
             <div className="task-list">
-              {tasks.length === 0 && <p className="empty-list">No study tasks yet.</p>}
+              {tasks.length === 0 && <p className="empty-list">No study packages yet.</p>}
               {tasks.map((task) => (
                 <div key={task.id} className={task.id === selectedTask?.id ? "task-row active" : "task-row"}>
                   <button className="task-item" type="button" onClick={() => setSelectedTask(task)}>
-                    <span>{task.title}</span>
-                    <small>{task.status}</small>
+                    <span className={`task-status-dot ${task.status}`} aria-hidden="true" />
+                    <span className="task-copy">
+                      <strong>{task.title}</strong>
+                      <small>{task.status} · {formatTaskDate(task.created_at)}</small>
+                    </span>
                   </button>
                   <button
                     aria-label={`Remove ${task.title}`}
+                    title="Remove task"
                     className="remove-task-button"
                     type="button"
                     onClick={() => handleDeleteTask(task.id)}
                   >
-                    Remove
+                    <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
               ))}

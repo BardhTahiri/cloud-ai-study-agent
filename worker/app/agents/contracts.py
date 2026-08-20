@@ -44,7 +44,7 @@ class StudyPackage(BaseModel):
 
 
 class GenerationMetadata(BaseModel):
-    tier: Literal["offline", "free", "paid"]
+    tier: Literal["offline", "free", "codex"]
     provider: str
     model: str
     fallback_reason: str | None = None

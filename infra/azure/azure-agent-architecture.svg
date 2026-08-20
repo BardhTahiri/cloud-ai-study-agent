@@ -107,11 +107,11 @@
   <text class="box-title" x="926" y="548">Celery worker</text>
   <text class="body" x="926" y="578">Consumes queued study jobs</text>
   <text class="body" x="926" y="603">Generates the study package</text>
-  <text class="small" x="926" y="631">No ingress | 1 replica</text>
+  <text class="small" x="926" y="631">No ingress | persistent Codex auth mount</text>
 
   <rect x="575" y="692" width="610" height="58" rx="8" fill="#fff8e8" stroke="#d69b28" stroke-width="2"/>
-  <text class="body" x="596" y="717">Generation mode active now: offline deterministic rules</text>
-  <text class="small" x="596" y="739">Free and paid LLM provider URLs are not configured yet</text>
+  <text class="body" x="596" y="717">Generation modes: Groq free or ChatGPT Codex subscription</text>
+  <text class="small" x="596" y="739">Codex runs in the worker; it is not an OpenAI-compatible HTTP endpoint</text>
 
   <!-- Redis -->
   <rect x="1280" y="420" width="230" height="260" rx="8" fill="#fff3f1" stroke="#d65343" stroke-width="3"/>

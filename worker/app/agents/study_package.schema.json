@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "QuizQuestion": {
+      "properties": {
+        "question": { "title": "Question", "type": "string" },
+        "answer": { "title": "Answer", "type": "string" },
+        "topic": { "title": "Topic", "type": "string" },
+        "options": {
+          "items": { "type": "string" },
+          "maxItems": 4,
+          "minItems": 3,
+          "title": "Options",
+          "type": "array"
+        },
+        "correct_option": { "title": "Correct Option", "type": "string" }
+      },
+      "required": ["question", "answer", "topic", "options", "correct_option"],
+      "title": "QuizQuestion",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "StudyPlanDay": {
+      "properties": {
+        "day": { "title": "Day", "type": "integer" },
+        "focus": { "title": "Focus", "type": "string" },
+        "tasks": {
+          "items": { "type": "string" },
+          "title": "Tasks",
+          "type": "array"
+        }
+      },
+      "required": ["day", "focus", "tasks"],
+      "title": "StudyPlanDay",
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "title": { "title": "Title", "type": "string" },
+    "important_topics": {
+      "items": { "type": "string" },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Important Topics",
+      "type": "array"
+    },
+    "summary": {
+      "items": { "type": "string" },
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Summary",
+      "type": "array"
+    },
+    "quiz": {
+      "items": { "$ref": "#/$defs/QuizQuestion" },
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Quiz",
+      "type": "array"
+    },
+    "study_plan": {
+      "items": { "$ref": "#/$defs/StudyPlanDay" },
+      "maxItems": 7,
+      "minItems": 1,
+      "title": "Study Plan",
+      "type": "array"
+    }
+  },
+  "required": ["title", "important_topics", "summary", "quiz", "study_plan"],
+  "title": "StudyPackage",
+  "type": "object",
+  "additionalProperties": false
+}

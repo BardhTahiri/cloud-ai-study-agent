@@ -123,20 +123,48 @@ def mark_dispatch_failed(task_id: str) -> None:
 
 
 def _sync_active_cloud_tasks(db: Session, tasks: list[StudyTaskRecord]) -> None:
+    orphaned_tasks = [
+        task
+        for task in tasks
+        if settings.task_queue_mode == "cloud"
+        and not task.agent_job_id
+        and task.status == TaskStatus.pending.value
+        and task.progress == 0
+    ]
     active_tasks = [
         task
         for task in tasks
         if task.agent_job_id and task.status in {TaskStatus.pending.value, TaskStatus.processing.value}
     ]
-    if not active_tasks or not settings.agent_base_url:
+    if not orphaned_tasks and not active_tasks:
         return
 
     try:
         client = build_cloud_agent_client()
-    except CloudAgentError:
+    except CloudAgentError as exc:
+        for task in orphaned_tasks:
+            _mark_failed(task, f"The cloud task could not be recovered: {exc}")
+        if orphaned_tasks:
+            db.commit()
         return
 
     changed = False
+    for task in orphaned_tasks:
+        try:
+            task.agent_job_id = client.submit(
+                StudyInput(title=task.title, prompt=task.prompt, material_text=task.material_text)
+            )
+            task.progress = 5
+            task.updated_at = utc_now()
+        except CloudAgentError as exc:
+            _mark_failed(task, f"The cloud task could not be recovered: {exc}")
+        changed = True
+
+    active_tasks = [
+        task
+        for task in tasks
+        if task.agent_job_id and task.status in {TaskStatus.pending.value, TaskStatus.processing.value}
+    ]
     for task in active_tasks:
         try:
             job = client.get_job(task.agent_job_id or "")

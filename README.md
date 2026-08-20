@@ -77,12 +77,25 @@ Then open:
 http://localhost:5173
 ```
 
-## Simulate The Hybrid Stack
+## Run With The Azure Agent
 
-Docker Compose starts the local application and a local simulation of the cloud agent:
+Set `TASK_QUEUE_MODE=cloud`, `AGENT_BASE_URL`, and `AGENT_API_KEY` in the ignored `.env` file, then start the local application:
 
 ```bash
 docker compose up --build
+```
+
+Only PostgreSQL, the backend, and the frontend start locally. The backend sends study jobs to the configured Azure agent API.
+
+## Simulate The Agent Locally
+
+The Redis, agent API, and Celery worker services are available through the optional `local-agent` profile:
+
+```powershell
+$env:TASK_QUEUE_MODE="cloud"
+$env:AGENT_BASE_URL="http://agent-api:8010"
+$env:AGENT_API_KEY="local-agent-key"
+docker compose --profile local-agent up --build
 ```
 
 Backend health should show the active database:
@@ -91,7 +104,7 @@ Backend health should show the active database:
 http://localhost:8000/health
 ```
 
-The backend submits a remote-style job to `agent-api`. The Celery worker processes it independently, and frontend polling copies the completed result into PostgreSQL.
+In this profile, the backend submits a remote-style job to the local `agent-api`. The Celery worker processes it independently, and frontend polling copies the completed result into PostgreSQL.
 
 ## Select The Study Agent
 
@@ -109,19 +122,31 @@ Free/local OpenAI-compatible model, such as Ollama running on the Docker host:
 LLM_BASE_URL=http://host.docker.internal:11434/v1
 FREE_LLM_MODEL=qwen3:8b
 LLM_API_KEY=
+FREE_LLM_MAX_INPUT_CHARS=12000
 ```
 
-For an OpenAI-compatible cloud endpoint, use that provider's `/v1` URL, free model name, and API key in the same variables.
+For an OpenAI-compatible cloud endpoint, use that provider's `/v1` URL, free model name, and API key in the same variables. Free-provider input is condensed to `FREE_LLM_MAX_INPUT_CHARS` before submission so large PDFs do not exceed token-per-minute limits.
 
-Paid OpenAI agent:
+ChatGPT subscription through Codex:
 
 ```env
-LLM_BASE_URL=https://api.openai.com/v1
-PAID_LLM_MODEL=gpt-5.6-sol
-OPENAI_API_KEY=your_key_here
+LLM_BASE_URL=codex://subscription
+CODEX_MODEL=gpt-5.6-sol
+CODEX_TIMEOUT_SECONDS=300
+LLM_MAX_INPUT_CHARS=100000
 ```
 
-By default, a provider error falls back to the offline generator and records that fact in the result. Set `LLM_FALLBACK_TO_OFFLINE=false` when a provider error should fail the task instead.
+Codex is not exposed as an HTTP API like Groq. The worker image runs the official Codex CLI in read-only, ephemeral mode and validates its final response against the same strict JSON Schema used by Groq. It removes API-key variables before starting Codex, so this mode must use the ChatGPT login cached under `CODEX_HOME` and consumes the account's Codex allowance.
+
+For the local agent profile, build the image, sign in once, and verify the cached session:
+
+```powershell
+docker compose --profile local-agent up --build -d
+docker compose --profile local-agent exec worker codex login --device-auth
+docker compose --profile local-agent exec worker codex login status
+```
+
+The `codex_auth` Docker volume persists refreshed credentials. Treat that volume like a password. The Azure worker uses the same design with a private Azure Files mount at `/codex-auth`. By default, a provider error falls back to the offline generator and records that fact in the result. Set `LLM_FALLBACK_TO_OFFLINE=false` only while verifying a provider so errors fail visibly instead.
 
 ## MVP Features
 
@@ -136,7 +161,7 @@ By default, a provider error falls back to the offline generator and records tha
 - persist courses and tasks in SQLite
 - poll task status while background processing finishes
 - process remote agent jobs through an authenticated API, Redis, and Celery
-- switch between free and paid model agents using the endpoint URL
+- switch between free-compatible and ChatGPT-authenticated Codex agents
 
 ## Next Implementation Steps
 

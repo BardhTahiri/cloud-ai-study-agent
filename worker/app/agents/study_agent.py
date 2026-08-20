@@ -7,21 +7,30 @@ from urllib.parse import urlparse
 
 from worker.app.agents.contracts import GenerationMetadata, StudyInput, StudyOutput, StudyPackage
 from worker.app.agents.deterministic_agent import generate_deterministic_package
-from worker.app.agents.llm_agent import FreeCompatibleStudyAgent, LlmAgentConfig, PaidOpenAIStudyAgent
+from worker.app.agents.llm_agent import (
+    CodexAgentConfig,
+    CodexSubscriptionStudyAgent,
+    FreeCompatibleStudyAgent,
+    LlmAgentConfig,
+)
 
 
 logger = logging.getLogger(__name__)
+CODEX_SUBSCRIPTION_URL = "codex://subscription"
 
 
 @dataclass(frozen=True)
 class AgentSettings:
     base_url: str
     free_model: str
-    paid_model: str
+    codex_model: str
     free_api_key: str
-    openai_api_key: str
+    codex_bin: str
+    codex_home: str
     timeout_seconds: float
+    codex_timeout_seconds: float
     max_input_chars: int
+    free_max_input_chars: int
     fallback_to_offline: bool
 
     @classmethod
@@ -29,11 +38,14 @@ class AgentSettings:
         return cls(
             base_url=os.getenv("LLM_BASE_URL", "").strip().rstrip("/"),
             free_model=os.getenv("FREE_LLM_MODEL", "qwen3:8b"),
-            paid_model=os.getenv("PAID_LLM_MODEL", "gpt-5.6-sol"),
+            codex_model=os.getenv("CODEX_MODEL", "gpt-5.6-sol"),
             free_api_key=os.getenv("LLM_API_KEY", ""),
-            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+            codex_bin=os.getenv("CODEX_BIN", "codex"),
+            codex_home=os.getenv("CODEX_HOME", "~/.codex"),
             timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
+            codex_timeout_seconds=float(os.getenv("CODEX_TIMEOUT_SECONDS", "300")),
             max_input_chars=int(os.getenv("LLM_MAX_INPUT_CHARS", "100000")),
+            free_max_input_chars=int(os.getenv("FREE_LLM_MAX_INPUT_CHARS", "12000")),
             fallback_to_offline=_env_bool("LLM_FALLBACK_TO_OFFLINE", default=True),
         )
 
@@ -63,30 +75,39 @@ def generate_study_package(study_input: StudyInput) -> StudyOutput:
 def detect_agent_tier(base_url: str) -> str:
     if not base_url:
         return "offline"
+    if base_url.lower() == CODEX_SUBSCRIPTION_URL:
+        return "codex"
 
     parsed = urlparse(base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError("LLM_BASE_URL must be an absolute http or https URL.")
-    return "paid" if parsed.hostname.lower() == "api.openai.com" else "free"
+        raise ValueError(
+            f"LLM_BASE_URL must be {CODEX_SUBSCRIPTION_URL!r} or an absolute http/https URL."
+        )
+    if parsed.hostname.lower() == "api.openai.com":
+        raise ValueError(
+            f"The paid OpenAI API provider was removed. Use {CODEX_SUBSCRIPTION_URL!r} "
+            "for ChatGPT subscription access."
+        )
+    return "free"
 
 
 def _build_llm_agent(settings: AgentSettings, tier: str):
-    if tier == "paid":
-        config = LlmAgentConfig(
-            base_url=settings.base_url,
-            model=settings.paid_model,
-            api_key=settings.openai_api_key,
-            timeout_seconds=settings.timeout_seconds,
+    if tier == "codex":
+        config = CodexAgentConfig(
+            model=settings.codex_model,
+            codex_bin=settings.codex_bin,
+            codex_home=os.path.expanduser(settings.codex_home),
+            timeout_seconds=settings.codex_timeout_seconds,
             max_input_chars=settings.max_input_chars,
         )
-        return PaidOpenAIStudyAgent(config)
+        return CodexSubscriptionStudyAgent(config)
 
     config = LlmAgentConfig(
         base_url=settings.base_url,
         model=settings.free_model,
         api_key=settings.free_api_key,
         timeout_seconds=settings.timeout_seconds,
-        max_input_chars=settings.max_input_chars,
+        max_input_chars=min(settings.max_input_chars, settings.free_max_input_chars),
     )
     return FreeCompatibleStudyAgent(config)
 

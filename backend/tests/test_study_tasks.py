@@ -6,6 +6,7 @@ os.environ["LLM_BASE_URL"] = ""
 
 from backend.app.main import app
 from backend.app.core.config import settings
+from backend.app.db.session import SessionLocal
 from backend.app.schemas.study import StudyTaskCreate
 from backend.app.services import study_service, task_dispatcher
 from backend.app.services.cloud_agent_client import CloudAgentJob
@@ -161,3 +162,71 @@ def test_cloud_mode_submits_material_and_saves_remote_result(monkeypatch):
         completed = task_response.json()
         assert completed["status"] == "completed"
         assert completed["result"] == generated_result
+
+
+def test_cloud_mode_recovers_pending_task_without_job_id(monkeypatch):
+    submitted_ids = []
+    generated_result = {
+        "title": "Recovered Cloud Task",
+        "important_topics": ["Recovery"],
+        "summary": ["Pending tasks without a cloud job ID are submitted again."],
+        "quiz": [
+            {
+                "question": "What happens to an orphaned pending task?",
+                "answer": "It is submitted again",
+                "topic": "Recovery",
+                "options": ["It is submitted again", "It polls forever", "It is hidden"],
+                "correct_option": "It is submitted again",
+            }
+        ],
+        "study_plan": [{"day": 1, "focus": "Recovery", "tasks": ["Review recovery behavior."]}],
+        "generation": {
+            "tier": "free",
+            "provider": "openai-compatible",
+            "model": "test-free-model",
+            "fallback_reason": None,
+        },
+    }
+
+    class FakeCloudAgentClient:
+        def submit(self, study_input):
+            submitted_ids.append(study_input.title)
+            return "recovered-job-123"
+
+        def get_job(self, job_id):
+            assert job_id == "recovered-job-123"
+            return CloudAgentJob(
+                job_id=job_id,
+                status="completed",
+                progress=100,
+                result=generated_result,
+            )
+
+    fake_client = FakeCloudAgentClient()
+    monkeypatch.setattr(settings, "task_queue_mode", "cloud")
+    monkeypatch.setattr(study_service, "build_cloud_agent_client", lambda: fake_client)
+
+    with SessionLocal() as db:
+        task = study_service.create_study_task(
+            db,
+            StudyTaskCreate(
+                title="Recovered Cloud Task",
+                prompt="Focus on recovery.",
+                material_text=(
+                    "A task can remain pending if a process stops before its cloud job ID is stored. "
+                    "The backend should recover that task instead of polling it forever."
+                ),
+                source_type="text",
+            ),
+        )
+        task_id = task.id
+
+    with TestClient(app) as client:
+        response = client.get(f"/api/study-tasks/{task_id}")
+
+    assert response.status_code == 200
+    recovered = response.json()
+    assert recovered["status"] == "completed"
+    assert recovered["progress"] == 100
+    assert recovered["result"] == generated_result
+    assert submitted_ids == ["Recovered Cloud Task"]
