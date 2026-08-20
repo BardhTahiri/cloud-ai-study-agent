@@ -9,13 +9,13 @@ The following resources are provisioned in `cloud-ai-study-rg`:
 ```text
 Region:          Germany West Central
 Registry:        cloudaistudyrg.azurecr.io
-Agent image:     cloud-ai-agent:v5 (live) / v6 (Codex migration target)
+Agent image:     cloud-ai-agent:v8 (Codex-capable target)
 Managed Redis:   cloud-ai-agent-redis
 Redis SKU:       Balanced_B0 (high availability disabled for development)
 Redis endpoint:  cloud-ai-agent-redis.germanywestcentral.redis.azure.net:10000
 ```
 
-Provider checkpoint (2026-08-20): Groq free mode is configured and verified with `openai/gpt-oss-20b` using strict JSON Schema output. The repository now replaces the paid OpenAI API adapter with a ChatGPT-authenticated Codex subscription adapter. The live v5 worker must remain on Groq until v6 is built, a persistent auth mount is attached, and Codex login is completed.
+Provider checkpoint (2026-08-20): Groq free mode is configured and verified with `openai/gpt-oss-20b` using strict JSON Schema output. The repository replaces the paid OpenAI API adapter with a ChatGPT-authenticated Codex subscription adapter. Image v8 includes the Codex Linux runtime and validates the CLI during the build; complete the persistent auth mount and Codex login before disabling offline fallback.
 
 The Redis database uses encrypted transport, access-key authentication, and the `NoCluster` policy required by the Celery/Kombu queue. The access key and complete `REDIS_URL` must be stored as Container Apps secrets and must not be committed.
 
@@ -257,7 +257,7 @@ az containerapp update --name cloud-ai-agent-worker --resource-group cloud-ai-st
 Build the Codex-capable image manually from the repository root:
 
 ```powershell
-az acr build --registry cloudaistudyrg --image cloud-ai-agent:v6 --file worker/Dockerfile .
+az acr build --registry cloudaistudyrg --image cloud-ai-agent:v8 --file worker/Dockerfile .
 ```
 
 ### Create persistent authentication storage
@@ -305,10 +305,10 @@ az containerapp update --name cloud-ai-agent-worker --resource-group cloud-ai-st
 
 ### Deploy and authenticate Codex
 
-Deploy v6, remove the legacy paid-provider variables, and select subscription mode. Keep fallback enabled until login succeeds:
+Deploy v8, remove the legacy paid-provider variables, and select subscription mode. Keep fallback enabled until login succeeds:
 
 ```powershell
-az containerapp update --name cloud-ai-agent-worker --resource-group cloud-ai-study-rg --image cloudaistudyrg.azurecr.io/cloud-ai-agent:v6 --remove-env-vars OPENAI_API_KEY PAID_LLM_MODEL OPENAI_REASONING_EFFORT OPENAI_MAX_OUTPUT_TOKENS --set-env-vars "LLM_BASE_URL=codex://subscription" "CODEX_MODEL=gpt-5.6-sol" "CODEX_BIN=codex" "CODEX_HOME=/codex-auth" "CODEX_TIMEOUT_SECONDS=300" "LLM_MAX_INPUT_CHARS=100000" "LLM_FALLBACK_TO_OFFLINE=true"
+az containerapp update --name cloud-ai-agent-worker --resource-group cloud-ai-study-rg --image cloudaistudyrg.azurecr.io/cloud-ai-agent:v8 --remove-env-vars OPENAI_API_KEY PAID_LLM_MODEL OPENAI_REASONING_EFFORT OPENAI_MAX_OUTPUT_TOKENS --set-env-vars "LLM_BASE_URL=codex://subscription" "CODEX_MODEL=gpt-5.6-sol" "CODEX_BIN=codex" "CODEX_HOME=/codex-auth" "CODEX_TIMEOUT_SECONDS=300" "LLM_MAX_INPUT_CHARS=100000" "LLM_FALLBACK_TO_OFFLINE=true"
 ```
 
 Wait for the revision to become healthy. Open an interactive process in the worker and complete device login in your browser:
